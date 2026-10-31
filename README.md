@@ -1,6 +1,6 @@
 # MedTerm Quest
 
-**Current status (2026-10-31):** [Real source-bank acceptance](docs/tiered-bank-acceptance.md) passed, followed by [Phase 3 portable weekly learning](docs/phase3-acceptance.md) and Phase 4 versioned manual file exchange. Use **Weekly learning** to copy the desktop bank, play local daily challenges, or import/export JSON files. Android packaging and native reminders have not started. See [the current milestone guide](docs/phase4-manual-sync.md).
+**Current status (2026-11-01):** Six-mode portable learning runs in the desktop browser, [GitHub Pages](https://annie04082020.github.io/MedTerm-Quest/) and Android APK. Phase 4 adds optional [encrypted Gist sync](docs/gist-sync.md) alongside manual files. Phase 5/6 integrate native SQLite, stable automatic APK builds and local daily/weekly reminders; native acceptance results are recorded by the actual [Actions runs](https://github.com/Annie04082020/MedTerm-Quest/actions). Live Gist acceptance is pending the user-provided runtime token.
 
 A local-first, bilingual medical terminology and physiology study app for engineering students. React + TypeScript + Vite + Tailwind CSS, FastAPI, SQLite, and optional fully local AI through Ollama. All six existing games remain playable without any AI service running. No payment details, subscription, cloud inference, or API key is used.
 
@@ -146,7 +146,7 @@ The paid-provider integration plan has been replaced. See [the updated developme
 - Questions use Pydantic and tiered source validation. Eligible source-extractive or provisional exercises publish under policy; uncertain free-form medical claims remain held, without learner medical approval.
 - Local conceptual grading is advisory and separates spelling from concepts. Normal deterministic games and self-assessment remain available without Ollama.
 - Optional model files, transcription packages, and CUDA runtimes are not installed automatically. Real-model quality, speed, and GPU execution need an acceptance check after local model provisioning.
-- Versioned manual files and initial spaced scheduling are implemented. OCR, cold-start Android offline packaging, native reminders and optional Wi-Fi synchronization remain future work.
+- Versioned file exchange, optional encrypted Gist synchronization, offline Android packaging and native reminders are implemented. OCR and optional Wi-Fi synchronization remain future work.
 
 Local endpoints under `/api/local`: `status`, `imports`, `sources`, `generate`, `grade`, `jobs`, and `drafts`. See [interactive API docs](http://127.0.0.1:8000/docs) for request schemas. Run one backend worker.
 

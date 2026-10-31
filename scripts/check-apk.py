@@ -6,7 +6,7 @@ with zipfile.ZipFile(sys.argv[1]) as apk:
     assert 'assets/public/index.html' in names,'Missing bundled app shell'
     info=json.loads(apk.read('assets/public/bank-info.json'))
     assert info['bundled'] is False and info['active_questions']==0,'CI must not package course questions'
-    forbidden={'.pdf','.mp4','.srt','.vtt','.sqlite3','.db','.jks','.keystore'}
+    forbidden={'.pdf','.mp4','.srt','.vtt','.sqlite3','.db','.jks','.keystore','.p12','.pfx','.pem','.key','.dpapi','.gguf','.safetensors'}
     for name in names:
         assert PurePosixPath(name).suffix.lower() not in forbidden,name
         assert '/banks/' not in name and not name.endswith('/.env'),name

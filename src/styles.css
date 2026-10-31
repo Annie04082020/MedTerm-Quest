@@ -27,3 +27,4 @@
 .learning-panel blockquote{white-space:pre-wrap;overflow-wrap:anywhere;border-left:3px solid #789582;padding:12px;margin:16px 0;background:#f3f5ef;line-height:1.8}
 .learning-panel details,.challenge-state{margin:20px 0;padding:16px;background:#f7f8f4;border-radius:12px}
 .learning-panel .question-card{margin-top:16px}
+.sync-toast{position:fixed;right:12px;bottom:calc(96px + env(safe-area-inset-bottom,0px));z-index:50;width:min(440px,calc(100vw - 24px));box-shadow:0 6px 26px #0002;display:flex;gap:12px;align-items:center}.sync-toast span{overflow-wrap:anywhere}.sync-toast button{flex-shrink:0}

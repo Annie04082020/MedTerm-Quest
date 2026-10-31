@@ -41,7 +41,8 @@ public class OfflineLearningTest {
   context.deleteDatabase("medterm-learning.db");String fixture=asset("test-state.json");JSONObject original=new JSONObject(fixture);JSONArray qs=original.getJSONArray("questions");Map<String,JSONObject> questions=new HashMap<>();for(int i=0;i<qs.length();i++)questions.put(qs.getJSONObject(i).getString("id"),qs.getJSONObject(i));
   try(LearningDatabase db=new LearningDatabase(context)){db.commitState(fixture,0);}
   String[] permissions=context.getPackageManager().getPackageInfo(context.getPackageName(),PackageManager.GET_PERMISSIONS).requestedPermissions;
-  assertFalse("APK unexpectedly requests internet",permissions!=null&&Arrays.asList(permissions).contains("android.permission.INTERNET"));
+  assertTrue("Optional Gist sync needs internet permission",permissions!=null&&Arrays.asList(permissions).contains("android.permission.INTERNET"));
+  assertFalse("Study reminders must not request exact alarms",Arrays.asList(permissions).contains("android.permission.SCHEDULE_EXACT_ALARM"));
   Set<String> modes=new HashSet<>();
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
    attach(scenario);waitJs("document.body.innerText.includes('每週學習與每日挑戰')");click("開始今日挑戰");
@@ -83,5 +84,19 @@ public class OfflineLearningTest {
    try(LearningDatabase db=new LearningDatabase(context)){assertEquals(0,new JSONObject(db.loadState().payload).getJSONArray("events").length());}
    device.takeScreenshot(new java.io.File(context.getExternalCacheDir(),"local-file-transfer.png"));
   }finally{context.getContentResolver().delete(fixture,null,null);}
+ }
+ @Test public void remindersPersistAndDeliverWithoutNetwork()throws Exception{
+  // Only the test grants permission through shell; production requests it when enabled.
+  try(android.os.ParcelFileDescriptor p=InstrumentationRegistry.getInstrumentation().getUiAutomation().executeShellCommand("pm grant local.medtermquest.app android.permission.POST_NOTIFICATIONS")){try(java.io.InputStream input=new android.os.ParcelFileDescriptor.AutoCloseInputStream(p)){input.readAllBytes();}}
+  try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
+   attach(scenario);waitJs("document.body.innerText.includes('每日挑戰')");click("提醒設定");waitJs("!!document.querySelector('[aria-label=\"每日提醒\"]')");
+   evaluate("document.querySelector('[aria-label=\"每日提醒\"]').click();document.querySelector('[aria-label=\"每週提醒\"]').click();true");click("儲存提醒設定");waitJs("document.body.innerText.includes('2 個已排程提醒')");
+   scenario.recreate();attach(scenario);waitJs("document.body.innerText.includes('每日挑戰')");click("提醒設定");waitJs("document.querySelector('[aria-label=\"每日提醒\"]')?.checked&&document.querySelector('[aria-label=\"每週提醒\"]')?.checked&&document.body.innerText.includes('2 個已排程提醒')");
+   click("傳送測試提醒");waitJs("document.body.innerText.includes('已傳送本機測試提醒')");
+   android.app.NotificationManager manager=(android.app.NotificationManager)context.getSystemService(Context.NOTIFICATION_SERVICE);boolean received=false;long end=System.currentTimeMillis()+10000;
+   while(System.currentTimeMillis()<end){for(android.service.notification.StatusBarNotification n:manager.getActiveNotifications())if(n.getId()==63003){received=true;assertTrue(n.getNotification().extras.getString(android.app.Notification.EXTRA_TITLE).contains("測試提醒"));}if(received)break;Thread.sleep(100);}
+   assertTrue("Native local notification not delivered in airplane mode",received);
+   evaluate("document.querySelector('[aria-label=\"每日提醒\"]').click();document.querySelector('[aria-label=\"每週提醒\"]').click();true");click("儲存提醒設定");waitJs("document.body.innerText.includes('0 個已排程提醒')");manager.cancelAll();
+  }
  }
 }

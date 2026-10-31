@@ -2,14 +2,26 @@ name: Android offline APK
 on:
   push:
     branches: [main]
+    paths:
+      - 'src/**'
+      - 'android/**'
+      - 'backend/**'
+      - 'scripts/**'
+      - 'tests/**'
+      - 'public/**'
+      - 'index.html'
+      - 'package*.json'
+      - '*config*.ts'
+      - 'tsconfig*.json'
+      - '.github/workflows/android-apk.yml'
   pull_request:
   workflow_dispatch:
     inputs:
       signing:
-        description: Preview uses a temporary debug key; stable requires signing secrets
+        description: Auto uses the stable key when configured; preview uses a temporary debug key
         type: choice
-        options: [preview, stable]
-        default: preview
+        options: [auto, stable, preview]
+        default: auto
 permissions:
   contents: read
 concurrency:
@@ -97,41 +109,59 @@ jobs:
             cd android && ./gradlew --no-daemon :app:connectedDebugAndroidTest
       - name: Check the APK has no materials or question bank
         run: python scripts/check-apk.py android/app/build/outputs/apk/debug/app-debug.apk
-      - name: Prepare optional stable signing
-        if: github.event_name == 'workflow_dispatch' && inputs.signing == 'stable'
+      - name: Prepare stable signing when available
+        id: signing
+        if: github.event_name != 'pull_request'
         env:
           KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          SIGNING: ${{ inputs.signing || 'auto' }}
         run: |
-          test -n "$KEYSTORE" || { echo 'Set ANDROID_KEYSTORE_BASE64 and the three signing secrets first.'; exit 1; }
-          printf '%s' "$KEYSTORE" | base64 --decode > "$RUNNER_TEMP/medterm.jks"
-          chmod 600 "$RUNNER_TEMP/medterm.jks"
+          if [ "$SIGNING" = preview ]; then
+            echo 'stable=false' >> "$GITHUB_OUTPUT"
+          elif [ -n "$KEYSTORE" ] && [ -n "$STORE_PASSWORD" ] && [ -n "$KEY_ALIAS" ] && [ -n "$KEY_PASSWORD" ]; then
+            printf '%s' "$KEYSTORE" | base64 --decode > "$RUNNER_TEMP/medterm.p12"
+            chmod 600 "$RUNNER_TEMP/medterm.p12"
+            echo 'stable=true' >> "$GITHUB_OUTPUT"
+          elif [ "$SIGNING" = stable ] || [ -n "$KEYSTORE$STORE_PASSWORD$KEY_ALIAS$KEY_PASSWORD" ]; then
+            echo 'All four Android signing secrets are required together.'; exit 1
+          else
+            echo 'stable=false' >> "$GITHUB_OUTPUT"
+            echo '::notice::No stable signing key is configured; building a preview APK.'
+          fi
       - name: Build stable signed APK
-        if: github.event_name == 'workflow_dispatch' && inputs.signing == 'stable'
+        if: steps.signing.outputs.stable == 'true'
         working-directory: android
         env:
-          MEDTERM_KEYSTORE_PATH: ${{ runner.temp }}/medterm.jks
+          MEDTERM_KEYSTORE_PATH: ${{ runner.temp }}/medterm.p12
           MEDTERM_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           MEDTERM_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           MEDTERM_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        run: ./gradlew --no-daemon assembleRelease
+        run: |
+          ./gradlew --no-daemon :app:assembleRelease
+          signer=$(find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -V | tail -n 1)
+          "$signer" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
+          python ../scripts/check-apk.py app/build/outputs/apk/release/app-release.apk
       - name: Prepare APK artifact
         env:
-          SIGNING: ${{ inputs.signing }}
+          STABLE: ${{ steps.signing.outputs.stable }}
         run: |
           mkdir -p apk-output
-          if [ "$SIGNING" = stable ]; then
+          if [ "$STABLE" = true ]; then
             cp android/app/build/outputs/apk/release/app-release.apk apk-output/medterm-quest-stable.apk
           else
             cp android/app/build/outputs/apk/debug/app-debug.apk apk-output/medterm-quest-preview.apk
           fi
           sha256sum apk-output/*.apk > apk-output/SHA256SUMS.txt
-          printf 'No course materials or learning history are bundled. Import your local JSON bank on the device.\nPreview APKs use an ephemeral key; export progress before replacing with a differently signed app.\n' > apk-output/READ-ME.txt
+          printf 'No course materials, history, Gist token or passphrase are bundled. Import your local JSON bank or unlock optional encrypted Gist sync.\nPreview APKs use an ephemeral key; export progress before replacing with a differently signed app. Stable APKs retain the same signing identity for in-place updates.\n' > apk-output/READ-ME.txt
       - uses: actions/upload-artifact@v4
         with:
           name: medterm-quest-android-${{ github.run_number }}
           path: apk-output/
           if-no-files-found: error
-          retention-days: 7
+          retention-days: 30
       - name: Test reports
         if: always()
         uses: actions/upload-artifact@v4

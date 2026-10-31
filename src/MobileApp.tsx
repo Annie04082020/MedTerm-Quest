@@ -1,5 +1,7 @@
 import {useEffect,useState} from 'react';
-import {BookOpen,CalendarDays,History,ArrowLeftRight,WifiOff} from 'lucide-react';
+import {BookOpen,CalendarDays,History,ArrowLeftRight,WifiOff,Bell} from 'lucide-react';
+import ReminderPanel from './ReminderPanel';
+import {restoreReminders,watchReminderActions} from './reminderRuntime';
 import LearningPanel from './LearningPanel';
 import QuestionCard from './QuestionCard';
 import SyncPanel from './SyncPanel';
@@ -8,13 +10,14 @@ import {bootstrap} from './mobile/bootstrap';
 import {readState} from './learning/store';
 import {effectiveReviews,schedule,type State,type Rating} from './learning/core';
 import './mobile.css';
-type Tab='daily'|'practice'|'history'|'sync';
+type Tab='daily'|'practice'|'history'|'sync'|'reminders';
 export default function MobileApp(){
  const [ready,setReady]=useState(false),[error,setError]=useState(''),[tab,setTab]=useState<Tab>('daily'),[state,setState]=useState<State|null>(null);
  useEffect(()=>{bootstrap().then(s=>{setState(s);setReady(true);}).catch(e=>setError('本機資料未變更：'+(e as Error).message));},[]);
  useEffect(()=>{const refresh=()=>{void readState().then(setState).catch(e=>setError(String(e)));};window.addEventListener('medterm-data-changed',refresh);return()=>window.removeEventListener('medterm-data-changed',refresh);},[]);
+ useEffect(()=>{let cleanup:(()=>void)|undefined,disposed=false;const restore=()=>{if(document.visibilityState==='visible')void restoreReminders().catch(e=>setError((e as Error).message));};const open=()=>{setTab('daily');};restore();void watchReminderActions().then(remove=>{if(disposed)remove();else cleanup=remove;});document.addEventListener('visibilitychange',restore);window.addEventListener('medterm-open-daily',open);return()=>{disposed=true;cleanup?.();document.removeEventListener('visibilitychange',restore);window.removeEventListener('medterm-open-daily',open);};},[]);
  async function navigate(next:Tab){setTab(next);try{setState(await readState());}catch(e){setError(String(e));}window.scrollTo({top:0});}
- const tabs=[{id:'daily' as const,label:'每日挑戰',icon:CalendarDays},{id:'practice' as const,label:'自由練習',icon:BookOpen},{id:'history' as const,label:'學習紀錄',icon:History},{id:'sync' as const,label:'題庫交換',icon:ArrowLeftRight}];
+ const tabs=[{id:'daily' as const,label:'每日挑戰',icon:CalendarDays},{id:'practice' as const,label:'自由練習',icon:BookOpen},{id:'history' as const,label:'學習紀錄',icon:History},{id:'sync' as const,label:'題庫交換',icon:ArrowLeftRight},{id:'reminders' as const,label:'提醒設定',icon:Bell}];
  return <div className="mobile-app"><header className="mobile-header"><strong>MedTerm Quest</strong><span><WifiOff size={16}/>離線學習</span></header><main>
  {error&&<p role="alert">{error}</p>}
  {!ready?<div className="empty-state"><h1>{error?'無法開啟本機資料':'準備本機題庫…'}</h1><p>原始資料不會被自動清除。{error?'請保留備份，關閉後重試。':'第一次開啟後，請從「題庫交換」匯入本機題庫。'}</p></div>:<>
@@ -23,6 +26,7 @@ export default function MobileApp(){
  {tab==='practice'&&<MobilePractice/>}
  {tab==='history'&&state&&<LearningHistory state={state}/>}
  {tab==='sync'&&<><h1>題庫與進度交換</h1><p>由 Windows 處理教材與產題。這裡只匯入既有題庫、保存與交換學習進度。</p><SyncPanel onChanged={setState}/></>}
+ {tab==='reminders'&&<ReminderPanel/>}
  </>}
  </main><nav className="mobile-tabs" aria-label="行動學習導覽">{tabs.map(t=><button key={t.id} aria-current={tab===t.id?'page':undefined} onClick={()=>navigate(t.id)}><t.icon size={21}/>{t.label}</button>)}</nav></div>;
 }

@@ -2,6 +2,8 @@
 
 Open https://annie04082020.github.io/MedTerm-Quest/ and import a bank-only JSON under **題庫交換**. Questions and learning history stay in this browser's IndexedDB. Importing files does not upload them. Use exports to back up history or move it to Android; browser and APK storage are separate.
 
+You may now opt in to [encrypted Gist synchronization](gist-sync.md) to exchange question banks and reviews between those separate stores. Source files and local AI still remain on Windows. A runtime GitHub token and a shared passphrase are configured on each device; neither is bundled in the public site. Pages does not provide background local reminders; the Android APK does.
+
 Pages serves the portable learning interface. Windows FastAPI, SQLite authoring, external materials and Ollama processing remain local. No course questions, original materials or personal progress are bundled in the public deployment. The initial screen therefore asks for a question bank.
 
 The original white screen came from publishing `main:/` directly: its `index.html` refers to `/src/main.tsx`, which Pages cannot compile. The **Deploy learning app to GitHub Pages** Actions workflow now builds the `pages` mode, tests the `/MedTerm-Quest/` subpath, uploads only `dist-pages` and deploys that artifact. Repository **Settings → Pages → Source** must be **GitHub Actions**.

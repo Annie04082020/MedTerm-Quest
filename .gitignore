@@ -47,6 +47,7 @@ android/app/src/main/assets/capacitor.plugins.json
 *.jks
 *.p12
 *.pfx
+*.dpapi
 *.pem
 *.key
 *.gguf
