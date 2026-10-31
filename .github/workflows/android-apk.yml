@@ -91,8 +91,6 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -memory 1536
           disable-animations: true
           script: |
-            adb shell mkdir -p /sdcard/Download
-            adb push android/app/src/androidTest/assets/test-bank.json /sdcard/Download/medterm-ci-bank.json
             adb shell cmd connectivity airplane-mode enable
             adb shell svc wifi disable
             adb shell svc data disable

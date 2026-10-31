@@ -16,7 +16,7 @@ export default function MobileApp(){
  const tabs=[{id:'daily' as const,label:'每日挑戰',icon:CalendarDays},{id:'practice' as const,label:'自由練習',icon:BookOpen},{id:'history' as const,label:'學習紀錄',icon:History},{id:'sync' as const,label:'題庫交換',icon:ArrowLeftRight}];
  return <div className="mobile-app"><header className="mobile-header"><strong>MedTerm Quest</strong><span><WifiOff size={16}/>離線學習</span></header><main>
  {error&&<p role="alert">{error}</p>}
- {!ready?<div className="empty-state"><h1>{error?'無法開啟本機資料':'準備本機題庫…'}</h1><p>原始資料不會被自動清除。{error?'請保留備份，關閉後重試。':'第一次開啟會載入隨附的現有課程題。'}</p></div>:<>
+ {!ready?<div className="empty-state"><h1>{error?'無法開啟本機資料':'準備本機題庫…'}</h1><p>原始資料不會被自動清除。{error?'請保留備份，關閉後重試。':'第一次開啟後，請從「題庫交換」匯入本機題庫。'}</p></div>:<>
  {state&&!state.questions.some(q=>!q.deleted)&&<div className="library-notice"><div><strong>先匯入課程題庫</strong><p>APK 不包含教材或個人進度。將 Windows 匯出的題庫 JSON 複製到手機，再從「題庫交換」匯入。</p><button className="primary-button" onClick={()=>navigate('sync')}>前往題庫交換</button></div></div>}
  {tab==='daily'&&<LearningPanel mobile renderQuestion={(q,answer,report,next)=><QuestionCard key={q.id+'@'+q.revision} question={q} number={1} total={1} onSaved={async()=>{}} onNext={next} onPrevious={()=>{}} onAnswer={answer} onReport={report} allowDesktopSources={false}/>}/>}
  {tab==='practice'&&<MobilePractice/>}

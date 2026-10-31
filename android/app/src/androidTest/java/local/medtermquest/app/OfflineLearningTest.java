@@ -1,6 +1,9 @@
 package local.medtermquest.app;
 
 import android.content.Context;
+import android.content.ContentValues;
+import android.net.Uri;
+import android.provider.MediaStore;
 import android.content.pm.PackageManager;
 import android.webkit.WebView;
 import androidx.test.core.app.ActivityScenario;
@@ -62,16 +65,23 @@ public class OfflineLearningTest {
  }
  @Test public void systemDocumentImportCancellationAndExportUseLocalFiles()throws Exception{
   context.deleteDatabase("medterm-learning.db");UiDevice device=UiDevice.getInstance(InstrumentationRegistry.getInstrumentation());
+  // Register a real local Downloads document. adb push alone does not index a
+  // non-media JSON file in Android's Downloads provider on current API levels.
+  ContentValues values=new ContentValues();values.put(MediaStore.Downloads.DISPLAY_NAME,"medterm-ci-bank.json");values.put(MediaStore.Downloads.MIME_TYPE,"application/json");values.put(MediaStore.Downloads.RELATIVE_PATH,"Download/");
+  Uri fixture=context.getContentResolver().insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI,values);assertNotNull(fixture);
+  try(java.io.OutputStream output=context.getContentResolver().openOutputStream(fixture)){assertNotNull(output);output.write(asset("test-bank.json").getBytes(StandardCharsets.UTF_8));}
   try(ActivityScenario<MainActivity> scenario=ActivityScenario.launch(MainActivity.class)){
    attach(scenario);waitJs("document.body.innerText.includes('先匯入課程題庫')");click("題庫交換");click("選擇本機題庫或進度檔案");
    if(device.wait(Until.hasObject(By.desc("Show roots")),3000)){device.findObject(By.desc("Show roots")).click();device.wait(Until.hasObject(By.text("Downloads")),5000);device.findObject(By.text("Downloads")).click();}
-   assertTrue("CI fixture not visible in Downloads",device.wait(Until.hasObject(By.text("medterm-ci-bank.json")),10000));device.findObject(By.text("medterm-ci-bank.json")).click();
+   boolean visible=device.wait(Until.hasObject(By.text("medterm-ci-bank.json")),10000);
+   if(!visible){java.io.ByteArrayOutputStream hierarchy=new java.io.ByteArrayOutputStream();device.dumpWindowHierarchy(hierarchy);fail("CI fixture not visible in Downloads: "+hierarchy.toString(StandardCharsets.UTF_8));}
+   device.findObject(By.text("medterm-ci-bank.json")).click();
    click("套用已驗證的匯入檔");waitJs("document.body.innerText.includes('匯入完成')");
    try(LearningDatabase db=new LearningDatabase(context)){assertEquals(16,new JSONObject(db.loadState().payload).getJSONArray("questions").length());}
    click("選擇本機題庫或進度檔案");Thread.sleep(1000);device.pressBack();waitJs("document.body.innerText.includes('已取消匯入')");
    click("匯出題庫");assertTrue(device.wait(Until.hasObject(By.text(java.util.regex.Pattern.compile("(?i)save"))),10000));device.findObject(By.text(java.util.regex.Pattern.compile("(?i)save"))).click();waitJs("document.body.innerText.includes('已將檔案儲存')");
    try(LearningDatabase db=new LearningDatabase(context)){assertEquals(0,new JSONObject(db.loadState().payload).getJSONArray("events").length());}
    device.takeScreenshot(new java.io.File(context.getExternalCacheDir(),"local-file-transfer.png"));
-  }
+  }finally{context.getContentResolver().delete(fixture,null,null);}
  }
 }
