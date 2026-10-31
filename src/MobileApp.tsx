@@ -12,6 +12,7 @@ type Tab='daily'|'practice'|'history'|'sync';
 export default function MobileApp(){
  const [ready,setReady]=useState(false),[error,setError]=useState(''),[tab,setTab]=useState<Tab>('daily'),[state,setState]=useState<State|null>(null);
  useEffect(()=>{bootstrap().then(s=>{setState(s);setReady(true);}).catch(e=>setError('本機資料未變更：'+(e as Error).message));},[]);
+ useEffect(()=>{const refresh=()=>{void readState().then(setState).catch(e=>setError(String(e)));};window.addEventListener('medterm-data-changed',refresh);return()=>window.removeEventListener('medterm-data-changed',refresh);},[]);
  async function navigate(next:Tab){setTab(next);try{setState(await readState());}catch(e){setError(String(e));}window.scrollTo({top:0});}
  const tabs=[{id:'daily' as const,label:'每日挑戰',icon:CalendarDays},{id:'practice' as const,label:'自由練習',icon:BookOpen},{id:'history' as const,label:'學習紀錄',icon:History},{id:'sync' as const,label:'題庫交換',icon:ArrowLeftRight}];
  return <div className="mobile-app"><header className="mobile-header"><strong>MedTerm Quest</strong><span><WifiOff size={16}/>離線學習</span></header><main>

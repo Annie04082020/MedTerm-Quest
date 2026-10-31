@@ -1,0 +1,18 @@
+import {test,expect,type Page} from '@playwright/test';
+import fs from 'node:fs';
+const id='a'.repeat(32),password='public-test-password-only',token='test-only-fake-token';
+async function unlock(page:Page,gistId='',auto=false){await page.getByRole('button',{name:'題庫交換',exact:true}).click();await page.getByLabel('Gist ID',{exact:true}).fill(gistId);await page.getByLabel('GitHub Token',{exact:true}).fill(token);await page.getByLabel('同步密碼',{exact:true}).fill(password);await page.getByText('加密記住此裝置的 Token',{exact:false}).check();if(auto)await page.getByText('解鎖後自動同步',{exact:false}).check();await page.getByRole('button',{name:'儲存設定並解鎖'}).click();await expect(page.getByRole('button',{name:'立即同步',exact:true})).toBeVisible();}
+test('two browser installations exchange encrypted banks and reviews; credentials stay local',async({browser,baseURL})=>{
+ test.setTimeout(90000);const a=await browser.newContext(),b=await browser.newContext();let files:Record<string,{content:string}>={},writes=0;
+ for(const context of [a,b])await context.route('https://api.github.com/gists**',async route=>{const req=route.request();if(req.method()==='GET')return route.fulfill({json:{public:false,files}});const data=req.postDataJSON();expect(Object.keys(data.files)).toHaveLength(1);Object.assign(files,data.files);writes++;return route.fulfill({json:{id,public:false,files}});});
+ try{const one=await a.newPage();await one.goto(baseURL!);await one.getByRole('button',{name:'題庫交換',exact:true}).click();await one.getByLabel('匯入題庫或進度檔案').setInputFiles('data/acceptance/phase5/sample-bank.json');await one.getByRole('button',{name:'套用已驗證的匯入檔'}).click();await expect(one.getByText(/匯入完成。既有作答/)).toBeVisible();await unlock(one,'',true);await expect.poll(()=>writes).toBeGreaterThan(0);
+ await expect.poll(()=>one.evaluate(()=>JSON.parse(localStorage.getItem('medterm-gist-v1')||'{}').id)).toBe(id);
+ await one.getByRole('button',{name:'每日挑戰',exact:true}).click();await one.getByLabel('加入示範題（預設關閉）').check();await one.getByLabel('每日題數',{exact:true}).fill('1');await one.getByRole('button',{name:'自由練習',exact:true}).click();await one.getByLabel('自由練習玩法').selectOption('multiple_choice');await one.getByRole('button',{name:'開始自由練習',exact:true}).click();await one.locator('.question-card').waitFor();
+ const qid=await one.locator('.question-card').getAttribute('data-question-id'),bank=JSON.parse(fs.readFileSync('data/acceptance/phase5/sample-bank.json','utf8'));const q=bank.body.questions.find((q:any)=>q.id===qid);await one.locator('.choices').getByText(q.answer,{exact:true}).click();
+ await one.getByRole('button',{name:'Check answer',exact:true}).click();await one.locator('.answer-result').waitFor();await one.getByRole('button',{name:'下一題',exact:true}).click();
+ await expect.poll(()=>writes).toBeGreaterThan(1);
+ const two=await b.newPage();await two.goto(baseURL!);await unlock(two,id);await two.getByRole('button',{name:'立即同步',exact:true}).click();await expect(two.getByText('同步完成。題庫與作答已合併；本機進度保留。',{exact:false})).toBeVisible();await two.getByRole('button',{name:'學習紀錄',exact:true}).click();await expect(two.getByText(/1 筆作答/)).toBeVisible();expect(Object.keys(files)).toHaveLength(2);expect(JSON.stringify(files)).not.toContain(token);expect(JSON.stringify(files)).not.toContain('sample:');
+ const local=await one.evaluate(()=>localStorage.getItem('medterm-gist-v1'));expect(local).not.toContain(token);expect(local).not.toContain(password);
+ await one.reload();await one.getByRole('button',{name:'題庫交換',exact:true}).click();await one.getByLabel('同步密碼',{exact:true}).fill(password);await one.getByRole('button',{name:'儲存設定並解鎖'}).click();await expect(one.getByRole('button',{name:'立即同步',exact:true})).toBeVisible();
+ }finally{await a.close();await b.close();}
+});

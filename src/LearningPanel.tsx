@@ -10,7 +10,7 @@ export default function LearningPanel({renderQuestion,mobile=false}:{mobile?:boo
  const [pending,setPending]=useState<State|null>(null);
  const settingsVersion=useRef(0);
  const hintSeen=useRef(false);
- useEffect(()=>{readState().then(setState).catch(e=>setError(String(e)));},[]);
+ useEffect(()=>{const refresh=()=>{readState().then(setState).catch(e=>setError(String(e)));};refresh();window.addEventListener('medterm-data-changed',refresh);return()=>window.removeEventListener('medterm-data-changed',refresh);},[]);
  async function mutate(fn:(s:State)=>void){try{const next=await updateState(fn);setState(next);setPending(null);return next;}catch(e){setError('本機保存失敗：'+String(e));throw e;}}
  async function copy(){setBusy(true);setError('');try{
   const response=await fetch('/api/learning/snapshot');if(!response.ok)throw Error('請先啟動桌面後端，或使用題庫檔案匯入。');
@@ -55,10 +55,10 @@ export default function LearningPanel({renderQuestion,mobile=false}:{mobile?:boo
  <p>{Object.values(session.remediation).filter(r=>r.complete).length} 個概念完成兩次不同題目的補強；今日補強不會取消日後複習排程。</p></div>}
  {q&&item&&<div key={q.id+session!.items.filter(i=>i.done).length}>
  <label><input type="checkbox" disabled={!!pending} checked={hint} onChange={e=>showHint(e.target.checked)}/>顯示原文提示（會記錄提示使用）</label>{item.hint_used&&<small>本題已使用提示；暫停後仍保留記錄。</small>}{hint&&<blockquote>{q.source.quote||q.explanation_zh}</blockquote>}
- {renderQuestion(q,answer,async()=>{await mutate(s=>{s.reports.push({id:crypto.randomUUID(),question_id:q.id,at:new Date().toISOString(),note:'學習者回報；本機隱藏，不要求醫學核准'});const live=s.sessions.find(x=>x.id===session!.id)!;const current=nextItem(live);if(current?.question_id===q.id)current.done=true;if(!nextItem(live))live.status='complete';});setPending(null);hintSeen.current=false;},()=>{if(pending){setState(pending);setPending(null);setHint(false);hintSeen.current=false;}})}
+ {renderQuestion(q,answer,async()=>{await mutate(s=>{s.reports.push({id:crypto.randomUUID(),question_id:q.id,at:new Date().toISOString(),note:'學習者回報；本機隱藏，不要求醫學核准'});const live=s.sessions.find(x=>x.id===session!.id)!;const current=nextItem(live);if(current?.question_id===q.id)current.done=true;if(!nextItem(live))live.status='complete';});setPending(null);hintSeen.current=false;},()=>{if(pending){setState(pending);setPending(null);setHint(false);hintSeen.current=false;if(pending.sessions.find(s=>s.id===session!.id)?.status==='complete')window.dispatchEvent(new Event('medterm-session-complete'));}})}
  <details onToggle={e=>{if(e.currentTarget.open&&!pending)void showHint(true);}}><summary>離線來源 · {q.source.title} · {q.source.section}</summary><blockquote>{q.source.quote||'此舊題僅有來源標記，沒有可攜引文。'}</blockquote></details>
  </div>}
- <p className="answer-hint">初版使用可測試的固定間隔排程（1、3、7、14、30、60 天），不是 FSRS，也不保證記憶成效。未滿 24 小時的重複練習不算長期回憶。題庫與進度只存在此瀏覽器，請保留備份。</p>
+ <p className="answer-hint">初版使用可測試的固定間隔排程（1、3、7、14、30、60 天），不是 FSRS，也不保證記憶成效。未滿 24 小時的重複練習不算長期回憶。本機保存題庫與進度；可選用加密 Gist 同步，並保留檔案備份。</p>
  {!mobile&&<SyncPanel onChanged={next=>{setState(next);setPending(null);setHint(false);hintSeen.current=false;}}/>}
  </section>;
 }
