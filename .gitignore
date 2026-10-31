@@ -34,6 +34,7 @@ temp_audio/
 *.mkv
 .tools/
 dist-android/
+dist-pages/
 android/.gradle/
 android/local.properties
 android/**/build/

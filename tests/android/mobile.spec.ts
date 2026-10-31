@@ -4,7 +4,7 @@ const path=fs.existsSync('data/exports/peripheral-circulation-bank-v1.json')?'da
 const bank=JSON.parse(fs.readFileSync(path,'utf8')).body;
 test('empty offline shell imports a local bank and plays six modes without APIs',async({page,context})=>{
  let apis=0;await page.route('**/api/**',r=>{apis++;return r.abort();});
- await page.goto('/');await expect(page.getByText('先匯入課程題庫',{exact:true})).toBeVisible();
+ await page.goto('./');await expect(page.getByText('先匯入課程題庫',{exact:true})).toBeVisible();
  await page.getByRole('button',{name:'題庫交換',exact:true}).click();
  await page.getByLabel('匯入題庫或進度檔案').setInputFiles(path);await page.getByRole('button',{name:'套用已驗證的匯入檔'}).click();await expect(page.getByText(/匯入完成。既有作答/)).toBeVisible();
  await page.getByRole('button',{name:'每日挑戰',exact:true}).click();
@@ -30,7 +30,7 @@ test('empty offline shell imports a local bank and plays six modes without APIs'
  await page.getByRole('button',{name:'學習紀錄',exact:true}).click();await expect(page.getByText(/16 筆作答/)).toBeVisible();
 });
 test('free practice uses local sessions and retains them after restart',async({page})=>{
- await page.goto('/');await page.getByRole('button',{name:'題庫交換',exact:true}).click();await page.getByLabel('匯入題庫或進度檔案').setInputFiles(path);await page.getByRole('button',{name:'套用已驗證的匯入檔'}).click();
+ await page.goto('./');await page.getByRole('button',{name:'題庫交換',exact:true}).click();await page.getByLabel('匯入題庫或進度檔案').setInputFiles(path);await page.getByRole('button',{name:'套用已驗證的匯入檔'}).click();
  await page.getByRole('button',{name:'每日挑戰',exact:true}).click();if(bank.questions.some((q:any)=>q.source.sample))await page.getByLabel('加入示範題（預設關閉）').check();
  await page.getByRole('button',{name:'自由練習',exact:true}).click();await page.getByLabel('自由練習玩法').selectOption('multiple_choice');await page.getByRole('button',{name:'開始自由練習',exact:true}).click();await page.locator('.question-card').waitFor();
  const id=await page.locator('.question-card').getAttribute('data-question-id');

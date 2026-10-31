@@ -12,7 +12,10 @@
     "build:android": "tsc -b && node scripts/build-mobile.mjs",
     "android:sync": "npm run build:android && cap sync android",
     "mobile:preview": "vite preview --outDir dist-android --host 127.0.0.1",
-    "test:mobile": "playwright test --config playwright.android.config.ts"
+    "test:mobile": "playwright test --config playwright.android.config.ts",
+    "build:pages": "tsc -b && node scripts/build-mobile.mjs --pages",
+    "preview:pages": "vite preview --mode pages --outDir dist-pages --host 127.0.0.1",
+    "test:pages": "playwright test --config playwright.pages.config.ts"
   },
   "dependencies": {
     "@capacitor/android": "8.6.0",
