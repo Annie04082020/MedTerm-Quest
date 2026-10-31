@@ -34,6 +34,6 @@ test('free practice uses local sessions and retains them after restart',async({p
  await page.getByRole('button',{name:'每日挑戰',exact:true}).click();if(bank.questions.some((q:any)=>q.source.sample))await page.getByLabel('加入示範題（預設關閉）').check();
  await page.getByRole('button',{name:'自由練習',exact:true}).click();await page.getByLabel('自由練習玩法').selectOption('multiple_choice');await page.getByRole('button',{name:'開始自由練習',exact:true}).click();await page.locator('.question-card').waitFor();
  const id=await page.locator('.question-card').getAttribute('data-question-id');
- await page.getByRole('button',{name:'暫停自由練習',exact:true}).click();await page.reload();await page.getByRole('button',{name:'自由練習',exact:true}).click();await page.getByRole('button',{name:'繼續自由練習',exact:true}).click();await expect(page.locator('.question-card')).toHaveAttribute('data-question-id',id!);
+ await page.getByRole('button',{name:'暫停自由練習',exact:true}).click();await expect(page.getByRole('button',{name:'繼續自由練習',exact:true})).toBeVisible();await page.reload();await page.getByRole('button',{name:'自由練習',exact:true}).click();await page.getByRole('button',{name:'繼續自由練習',exact:true}).click();await expect(page.locator('.question-card')).toHaveAttribute('data-question-id',id!);
  const q=bank.questions.find((q:any)=>q.id===id);await page.locator('.choices').getByText(q.answer,{exact:true}).click();await page.getByRole('button',{name:'Check answer',exact:true}).click();await expect(page.locator('.answer-result.correct')).toBeVisible();
 });

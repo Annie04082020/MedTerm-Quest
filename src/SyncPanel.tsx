@@ -22,7 +22,7 @@ export default function SyncPanel({onChanged}:{onChanged:(s:State)=>void}){
   setPrepared(parsed);setMessage(`驗證完成：新增 ${preview.report.added} 筆內容，更新 ${preview.report.updated}，封存 ${preview.report.archived}，新增 ${preview.report.events_added} 筆歷史；略過舊版本 ${preview.report.stale_ignored}。尚未寫入。`);
  }catch(e){setError('未匯入，原資料保留：'+(e as Error).message);}finally{setBusy(false);}}
  async function commit(){if(!prepared)return;setBusy(true);setError('');try{
-  const next=await updateState(current=>{const merged=mergeSnapshot(current,{schema:1,questions:prepared.body.questions,concepts:prepared.body.concepts,events:prepared.body.events});Object.assign(current,merged.state);});
+  const next=await updateState(current=>{const fresh=current.questions.length===0;const merged=mergeSnapshot(current,{schema:1,questions:prepared.body.questions,concepts:prepared.body.concepts,events:prepared.body.events});Object.assign(current,merged.state);if(fresh){const first=current.questions.find(q=>!q.deleted);if(first){current.settings.course=first.course;current.settings.week=first.week;current.settings.topic='';current.settings.scopeWeeks=[first.week];}}});
   onChanged(next);setPrepared(null);setMessage('匯入完成。既有作答、週次設定及歷史已保留；精熟狀態依歷史重新計算。');
  }catch(e){setError('交易已取消，原資料保留：'+(e as Error).message);}finally{setBusy(false);}}
  return <section className="processing-panel"><h2>題庫檔案與進度交換</h2><p>完全手動，不使用雲端帳號或網路。先驗證整份檔案，再以單一交易保存。同一 ID／版本內容衝突會停止匯入，避免覆寫進度。</p>
