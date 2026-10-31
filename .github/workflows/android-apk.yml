@@ -1,0 +1,138 @@
+name: Android offline APK
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      signing:
+        description: Preview uses a temporary debug key; stable requires signing secrets
+        type: choice
+        options: [preview, stable]
+        default: preview
+permissions:
+  contents: read
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  MEDTERM_MOBILE_BANK: ''
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - run: npm ci
+      - run: python -m pip install -r backend/requirements-local-ai.txt pytest
+      - run: python -m pytest backend -q
+      - run: npm run test:core
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+      - run: node --experimental-strip-types scripts/mobile-test-fixtures.mjs
+      - run: npm run build:android
+      - run: npm run test:mobile
+  apk:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      MEDTERM_VERSION_CODE: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: npm
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - run: npm ci
+      - run: npm run android:sync
+      - run: node --experimental-strip-types scripts/mobile-test-fixtures.mjs --android-assets
+      - name: Native SQLite transaction and persistence tests
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon testDebugUnitTest assembleDebug assembleDebugAndroidTest
+      - name: Enable emulator KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Actual Android offline games and local document tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_5
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -memory 1536
+          disable-animations: true
+          script: |
+            adb shell mkdir -p /sdcard/Download
+            adb push android/app/src/androidTest/assets/test-bank.json /sdcard/Download/medterm-ci-bank.json
+            adb shell cmd connectivity airplane-mode enable
+            adb shell svc wifi disable
+            adb shell svc data disable
+            cd android && ./gradlew --no-daemon connectedDebugAndroidTest
+      - name: Check the APK has no materials or question bank
+        run: python scripts/check-apk.py android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Prepare optional stable signing
+        if: github.event_name == 'workflow_dispatch' && inputs.signing == 'stable'
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$KEYSTORE" || { echo 'Set ANDROID_KEYSTORE_BASE64 and the three signing secrets first.'; exit 1; }
+          printf '%s' "$KEYSTORE" | base64 --decode > "$RUNNER_TEMP/medterm.jks"
+          chmod 600 "$RUNNER_TEMP/medterm.jks"
+      - name: Build stable signed APK
+        if: github.event_name == 'workflow_dispatch' && inputs.signing == 'stable'
+        working-directory: android
+        env:
+          MEDTERM_KEYSTORE_PATH: ${{ runner.temp }}/medterm.jks
+          MEDTERM_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          MEDTERM_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          MEDTERM_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: ./gradlew --no-daemon assembleRelease
+      - name: Prepare APK artifact
+        env:
+          SIGNING: ${{ inputs.signing }}
+        run: |
+          mkdir -p apk-output
+          if [ "$SIGNING" = stable ]; then
+            cp android/app/build/outputs/apk/release/app-release.apk apk-output/medterm-quest-stable.apk
+          else
+            cp android/app/build/outputs/apk/debug/app-debug.apk apk-output/medterm-quest-preview.apk
+          fi
+          sha256sum apk-output/*.apk > apk-output/SHA256SUMS.txt
+          printf 'No course materials or learning history are bundled. Import your local JSON bank on the device.\nPreview APKs use an ephemeral key; export progress before replacing with a differently signed app.\n' > apk-output/READ-ME.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: medterm-quest-android-${{ github.run_number }}
+          path: apk-output/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-test-reports-${{ github.run_number }}
+          path: |
+            android/app/build/reports/tests/
+            android/app/build/reports/androidTests/
+          retention-days: 7

@@ -1,0 +1,66 @@
+apply plugin: 'com.android.application'
+
+android {
+    namespace = "local.medtermquest.app"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "local.medtermquest.app"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode Integer.parseInt(System.getenv('MEDTERM_VERSION_CODE') ?: '1')
+        versionName "0.5.${System.getenv('MEDTERM_VERSION_CODE') ?: '1'}"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    signingConfigs {
+        localRelease {
+            if (System.getenv('MEDTERM_KEYSTORE_PATH')) {
+                storeFile file(System.getenv('MEDTERM_KEYSTORE_PATH'))
+                storePassword System.getenv('MEDTERM_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('MEDTERM_KEY_ALIAS')
+                keyPassword System.getenv('MEDTERM_KEY_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            if (System.getenv('MEDTERM_KEYSTORE_PATH')) signingConfig signingConfigs.localRelease
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+    testOptions {
+        unitTests.includeAndroidResources = true
+        unitTests.all { maxHeapSize = '768m' }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    testImplementation 'androidx.test:core:1.7.0'
+    testImplementation 'org.robolectric:robolectric:4.16.1'
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    androidTestImplementation 'androidx.test:core:1.7.0'
+    androidTestImplementation 'androidx.test:rules:1.7.0'
+    androidTestImplementation 'androidx.test.uiautomator:uiautomator:2.3.0'
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+

@@ -1,0 +1,2 @@
+-r requirements-import.txt
+opencc-python-reimplemented==0.1.7

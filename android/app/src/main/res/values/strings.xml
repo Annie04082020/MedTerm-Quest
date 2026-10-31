@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MedTerm Quest</string>
+    <string name="title_activity_main">MedTerm Quest</string>
+    <string name="package_name">local.medtermquest.app</string>
+    <string name="custom_url_scheme">local.medtermquest.app</string>
+</resources>
