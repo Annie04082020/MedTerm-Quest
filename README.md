@@ -1,5 +1,7 @@
 # MedTerm Quest
 
+[Download the latest Android APK](https://github.com/Annie04082020/MedTerm-Quest/releases/latest/download/medterm-quest-stable.apk) · [Release history](https://github.com/Annie04082020/MedTerm-Quest/releases) · [Build & Release instructions](docs/android-apk.md)
+
 **Current status (2026-11-01):** Six-mode portable learning runs in the desktop browser, [GitHub Pages](https://annie04082020.github.io/MedTerm-Quest/) and Android APK. Phase 4 adds optional [encrypted Gist sync](docs/gist-sync.md) alongside manual files. Phase 5/6 integrate native SQLite, stable automatic APK builds and local daily/weekly reminders; native acceptance results are recorded by the actual [Actions runs](https://github.com/Annie04082020/MedTerm-Quest/actions). Live Gist acceptance is pending the user-provided runtime token.
 
 A local-first, bilingual medical terminology and physiology study app for engineering students. React + TypeScript + Vite + Tailwind CSS, FastAPI, SQLite, and optional fully local AI through Ollama. All six existing games remain playable without any AI service running. No payment details, subscription, cloud inference, or API key is used.

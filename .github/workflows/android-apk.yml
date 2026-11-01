@@ -1,7 +1,8 @@
-name: Android offline APK
+name: Build & Release APK
 on:
   push:
     branches: [main]
+    tags: ['v*']
     paths:
       - 'src/**'
       - 'android/**'
@@ -22,6 +23,10 @@ on:
         type: choice
         options: [auto, stable, preview]
         default: auto
+      version:
+        description: Optional release tag, e.g. v0.7.0; blank uses v0.6.<build number>
+        type: string
+        required: false
 permissions:
   contents: read
 concurrency:
@@ -46,7 +51,7 @@ jobs:
           python-version: '3.13'
       - run: npm ci
       - run: python -m pip install -r backend/requirements-local-ai.txt pytest
-      - run: python -m pytest backend -q
+      - run: python -m pytest backend tests/test_release_plan.py -q
       - run: npm run test:core
       - run: npm run build
       - run: npx playwright install --with-deps chromium
@@ -63,6 +68,10 @@ jobs:
           retention-days: 7
   apk:
     needs: validate
+    outputs:
+      stable: ${{ steps.signing.outputs.stable }}
+      tag: ${{ steps.version.outputs.tag }}
+      prerelease: ${{ steps.version.outputs.prerelease }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
@@ -71,6 +80,16 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+      - name: Resolve Android and release version
+        id: version
+        env:
+          MEDTERM_RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          python scripts/release_plan.py
+      - name: Set APK version name
+        env:
+          VERSION_NAME: ${{ steps.version.outputs.version }}
+        run: echo "MEDTERM_VERSION_NAME=$VERSION_NAME" >> "$GITHUB_ENV"
       - uses: actions/setup-node@v6
         with:
           node-version: '24'
@@ -154,7 +173,7 @@ jobs:
           else
             cp android/app/build/outputs/apk/debug/app-debug.apk apk-output/medterm-quest-preview.apk
           fi
-          sha256sum apk-output/*.apk > apk-output/SHA256SUMS.txt
+          (cd apk-output && sha256sum *.apk > SHA256SUMS.txt)
           printf 'No course materials, history, Gist token or passphrase are bundled. Import your local JSON bank or unlock optional encrypted Gist sync.\nPreview APKs use an ephemeral key; export progress before replacing with a differently signed app. Stable APKs retain the same signing identity for in-place updates.\n' > apk-output/READ-ME.txt
       - uses: actions/upload-artifact@v4
         with:
@@ -171,3 +190,57 @@ jobs:
             android/app/build/reports/tests/
             android/app/build/reports/androidTests/
           retention-days: 7
+  release:
+    name: Publish signed APK to GitHub Releases
+    needs: apk
+    if: needs.apk.outputs.stable == 'true' && github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5
+        with:
+          name: medterm-quest-android-${{ github.run_number }}
+          path: apk-output
+      - name: Verify and publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.apk.outputs.tag }}
+          PRERELEASE: ${{ needs.apk.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          test -f apk-output/medterm-quest-stable.apk
+          (cd apk-output && sha256sum --check SHA256SUMS.txt)
+          python scripts/check-apk.py apk-output/medterm-quest-stable.apk
+          target=$(git rev-parse HEAD)
+          if git show-ref --verify --quiet "refs/tags/$TAG"; then
+            test "$(git rev-parse "refs/tags/$TAG^{commit}")" = "$target" || { echo 'Existing tag points to different code; choose a new version.'; exit 1; }
+          fi
+          if gh release view "$TAG" --json isDraft --jq .isDraft > is-draft.txt 2>/dev/null; then
+            test "$(gh api "repos/$GH_REPO/releases/tags/$TAG" --jq .target_commitish)" = "$target" || { echo 'Existing release targets different code; choose a new version.'; exit 1; }
+            if [ "$(cat is-draft.txt)" = false ]; then
+              gh release view "$TAG" --json assets --jq '.assets[].name' > existing-assets.txt
+              for file in medterm-quest-stable.apk SHA256SUMS.txt READ-ME.txt; do
+                grep -Fxq "$file" existing-assets.txt || { echo 'Existing published release is incomplete; it was not overwritten.'; exit 1; }
+              done
+              echo 'Release already published for this commit; leaving its assets unchanged.'
+              exit 0
+            fi
+          else
+            printf 'Android APK built and tested from commit %s.\n\nImport your local question bank or unlock optional encrypted Gist sync. No course materials or credentials are bundled.\n\nThis APK uses the persistent signing identity. Export progress before replacing an old preview installation.\n' "$target" > release-notes.md
+            gh release create "$TAG" --target "$target" --title "MedTerm Quest $TAG" --draft --generate-notes --notes-file release-notes.md
+          fi
+          gh release upload "$TAG" apk-output/medterm-quest-stable.apk apk-output/SHA256SUMS.txt apk-output/READ-ME.txt --clobber
+          if [ "$PRERELEASE" = true ]; then
+            gh release edit "$TAG" --draft=false --prerelease --latest=false
+          else
+            gh release edit "$TAG" --draft=false --prerelease=false --latest
+          fi
+          printf '### APK release\n\n[Download %s](https://github.com/%s/releases/tag/%s)\n' "$TAG" "$GH_REPO" "$TAG" >> "$GITHUB_STEP_SUMMARY"

@@ -8,7 +8,7 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode Integer.parseInt(System.getenv('MEDTERM_VERSION_CODE') ?: '1')
-        versionName "0.6.${System.getenv('MEDTERM_VERSION_CODE') ?: '1'}"
+        versionName System.getenv('MEDTERM_VERSION_NAME') ?: "0.6.${System.getenv('MEDTERM_VERSION_CODE') ?: '1'}"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
